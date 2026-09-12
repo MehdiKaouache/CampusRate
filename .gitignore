@@ -1,1 +1,21 @@
-node_modules
+# Dépendances
+node_modules/
+
+# Fichiers produits par la compilation et les tests
+dist/
+coverage/
+*.tsbuildinfo
+
+# Variables d'environnement et secrets
+.env
+.env.*
+!.env.example
+
+# Journaux
+*.log
+npm-debug.log*
+
+# Fichiers propres aux outils et au système
+.vscode/
+.idea/
+.DS_Store
