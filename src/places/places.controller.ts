@@ -25,7 +25,7 @@ export class PlacesController {
     }
 
     @Patch(':id')
-    update(@Param('id') id: string, @Body() dto: UpdatePlaceDto,): Promise<Place> {
+    update(@Param('id') id: string, @Body() dto: UpdatePlaceDto): Promise<Place> {
         return this.placeService.update(id, dto);
     }
 
