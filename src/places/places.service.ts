@@ -5,14 +5,41 @@ import { CreatePlaceDto } from './dto/create-place.dto';
 import { generateId } from '../common/utils/id-generator';
 import { PlaceStatus } from './entities/place-status.enum';
 import { UpdatePlaceDto } from './dto/update-place.dto';
+import { PagesResponse } from '../common/dto/pages-response.dto';
+import { FindPlacesQueryDto } from './dto/find-places-query.dto';
 
 @Injectable()
 export class PlacesService {
     constructor(private readonly database: JsonDatabaseService){}
 
-    async findAll(): Promise<Place[]> {
+    async findAll(query: FindPlacesQueryDto): Promise<PagesResponse<Place>> {
         const data = await this.database.read();
-        return data.places;
+        
+        let filteredPlaces = data.places;
+
+        if (query.category !== undefined) {
+            filteredPlaces = filteredPlaces.filter(
+                (p) => p.category === query.category,
+            );
+        }
+
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 10;
+        const totalItems = filteredPlaces.length;
+        const totalPages = Math.ceil(totalItems / limit);
+
+        const start = (page - 1) * limit;
+        const paginatedPlaces = filteredPlaces.slice(start, start + limit);
+
+        return {
+            data: paginatedPlaces,
+            pagination: {
+                page,
+                limit,
+                totalItems,
+                totalPages,
+            },
+        };
     }
 
     async create(dto: CreatePlaceDto): Promise<Place>{
