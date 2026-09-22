@@ -2,8 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { CreatePlaceDto } from './places/dto/create-place.dto';
-import { CreateReviewDto } from './reviews/dto/create-review.dto';
+import { configureSwagger } from './configure-swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,7 +10,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.enableVersioning({
     type: VersioningType.URI,
-    defaultVersion: '1',
+    defaultVersion: '1'
   });
 
   app.useGlobalFilters(new HttpExceptionFilter());
@@ -20,9 +19,11 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
-      transform: true,
+      transform: true
     }),
   );
+
+  configureSwagger(app);
 
   await app.listen(process.env.PORT ?? 3000);
 }
