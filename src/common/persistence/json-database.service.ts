@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { Database } from './database.types';
+import { ConfigService } from '@nestjs/config';
 
 const DEFAULT_DATA_FILE_PATH = './data/campus-rate.json';
 
@@ -9,8 +10,8 @@ const DEFAULT_DATA_FILE_PATH = './data/campus-rate.json';
 export class JsonDatabaseService {
   private readonly filePath: string;
 
-  constructor() {
-    this.filePath = process.env.DATA_FILE_PATH ?? DEFAULT_DATA_FILE_PATH;
+  constructor(private readonly configService: ConfigService) {
+    this.filePath = this.configService.get<string>('DATA_FILE_PATH')!;
   }
 
   async read(): Promise<Database> {
