@@ -27,8 +27,8 @@ async function bootstrap() {
   configureSwagger(app);
 
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT');
+  const port = configService.get<number>('PORT')!;
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(port);
 }
 bootstrap();

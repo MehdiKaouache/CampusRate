@@ -1,0 +1,728 @@
+{
+  "info": {
+    "name": "CampusRate",
+    "description": "Collection d'essais manuels pour l'API CampusRate (TP1, 420-514). Couvre la creation et la consultation des deux ressources, une modification, une suppression permise, une note invalide, une ressource inexistante, un conflit de suppression, le filtre, la pagination, une erreur Problem Details, et la verification de la persistance apres redemarrage.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "placeId",
+      "value": ""
+    },
+    {
+      "key": "reviewId",
+      "value": ""
+    },
+    {
+      "key": "placeToDeleteId",
+      "value": ""
+    },
+    {
+      "key": "placeConflictId",
+      "value": ""
+    },
+    {
+      "key": "reviewConflictId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Places",
+      "item": [
+        {
+          "name": "1. Creer un endroit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Cree un endroit et enregistre son id pour les requetes suivantes. Attendu : 201 Created.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bibliotheque principale\",\n  \"description\": \"Espace calme avec prises.\",\n  \"category\": \"LIBRARY\",\n  \"address\": \"Pavillon A, local A-210\",\n  \"services\": [\n    \"WIFI\",\n    \"POWER_OUTLETS\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('placeId', data.id);",
+                  "pm.test('averageRating is null', function () { pm.expect(data.averageRating).to.be.null; });",
+                  "pm.test('reviewCount is 0', function () { pm.expect(data.reviewCount).to.eql(0); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Consulter l'endroit cree",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeId}}"
+              ]
+            },
+            "description": "Consulte l'endroit cree a l'etape precedente. Attendu : 200 OK."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Modifier partiellement l'endroit",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeId}}"
+              ]
+            },
+            "description": "Modifie uniquement le statut de l'endroit. Attendu : 200 OK, updatedAt change, les autres champs restent identiques.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"TEMPORARILY_CLOSED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "pm.test('status was updated', function () { pm.expect(data.status).to.eql('TEMPORARILY_CLOSED'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Filtrer les endroits par categorie",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places?category=LIBRARY",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ],
+              "query": [
+                [
+                  "category",
+                  "LIBRARY"
+                ]
+              ]
+            },
+            "description": "Filtre exact sur la categorie LIBRARY. Attendu : 200 OK, uniquement des endroits LIBRARY dans data."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "pm.test('all results match category', function () {",
+                  "  data.data.forEach((place) => pm.expect(place.category).to.eql('LIBRARY'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Pagination des endroits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places?page=1&limit=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ],
+              "query": [
+                [
+                  "page",
+                  "1"
+                ],
+                [
+                  "limit",
+                  "2"
+                ]
+              ]
+            },
+            "description": "Verifie la pagination. Attendu : 200 OK, data.length <= 2, pagination.limit = 2."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "pm.test('limit is respected', function () { pm.expect(data.data.length).to.be.at.most(2); });",
+                  "pm.test('pagination meta present', function () {",
+                  "  pm.expect(data.pagination).to.have.property('totalItems');",
+                  "  pm.expect(data.pagination).to.have.property('totalPages');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Reviews",
+      "item": [
+        {
+          "name": "1. Creer une appreciation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeId}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeId}}",
+                "reviews"
+              ]
+            },
+            "description": "Cree une appreciation pour l'endroit cree plus tot. Attendu : 201 Created.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorName\": \"Samira\",\n  \"rating\": 4,\n  \"comment\": \"Calme et Wi-Fi stable.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('reviewId', data.id);",
+                  "pm.test('placeId matches', function () { pm.expect(data.placeId).to.eql(pm.collectionVariables.get('placeId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Consulter l'appreciation creee",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/{{reviewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews",
+                "{{reviewId}}"
+              ]
+            },
+            "description": "Consulte l'appreciation via son id, independamment de l'endroit. Attendu : 200 OK."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Verifier la mise a jour de la note moyenne",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeId}}"
+              ]
+            },
+            "description": "Confirme que averageRating et reviewCount de l'endroit ont ete recalcules apres la creation de l'appreciation. Attendu : averageRating = 4, reviewCount = 1."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "const data = pm.response.json();",
+                  "pm.test('averageRating reflects the review', function () { pm.expect(data.averageRating).to.eql(4); });",
+                  "pm.test('reviewCount reflects the review', function () { pm.expect(data.reviewCount).to.eql(1); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Supprimer l'appreciation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/{{reviewId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews",
+                "{{reviewId}}"
+              ]
+            },
+            "description": "Supprime l'appreciation. Attendu : 204 No Content, corps vide."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Scenarios de suppression",
+      "item": [
+        {
+          "name": "1. Creer un endroit a supprimer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Cree un endroit sans aucune appreciation, pour tester la suppression permise.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Local temporaire\",\n  \"description\": \"Endroit destine a etre supprime.\",\n  \"category\": \"OTHER\",\n  \"address\": \"Pavillon C\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('placeToDeleteId', data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Supprimer l'endroit (suppression permise)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeToDeleteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeToDeleteId}}"
+              ]
+            },
+            "description": "L'endroit ne possede aucune appreciation : la suppression doit etre permise. Attendu : 204 No Content."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', function () { pm.response.to.have.status(204); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Creer un endroit pour le scenario de conflit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Cree un endroit qui recevra une appreciation, pour declencher un conflit de suppression.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Local avec appreciation\",\n  \"description\": \"Endroit qui recevra une appreciation.\",\n  \"category\": \"OTHER\",\n  \"address\": \"Pavillon D\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('placeConflictId', data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Ajouter une appreciation a cet endroit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeConflictId}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeConflictId}}",
+                "reviews"
+              ]
+            },
+            "description": "Ajoute une appreciation, ce qui doit empecher la suppression de l'endroit.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorName\": \"Test\",\n  \"rating\": 3,\n  \"comment\": \"Appreciation pour test de conflit.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set('reviewConflictId', data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Tentative de suppression (409 Conflict)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeConflictId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeConflictId}}"
+              ]
+            },
+            "description": "L'endroit possede une appreciation : la suppression doit etre refusee. Attendu : 409 Conflict, format Problem Details."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', function () { pm.response.to.have.status(409); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  pm.expect(data).to.have.property('type');",
+                  "  pm.expect(data).to.have.property('title');",
+                  "  pm.expect(data).to.have.property('status');",
+                  "  pm.expect(data).to.have.property('detail');",
+                  "  pm.expect(data).to.have.property('instance');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 - Scenarios d'erreur",
+      "item": [
+        {
+          "name": "1. Note invalide (400 Bad Request)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeId}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeId}}",
+                "reviews"
+              ]
+            },
+            "description": "La note doit etre entre 1 et 5. Attendu : 400 Bad Request, format Problem Details.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorName\": \"Test\",\n  \"rating\": 999,\n  \"comment\": \"Note hors limite.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  pm.expect(data).to.have.property('type');",
+                  "  pm.expect(data).to.have.property('status', 400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Endroit inexistant (404 Not Found)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places/plc_inexistant123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "plc_inexistant123"
+              ]
+            },
+            "description": "Consultation d'un identifiant qui n'existe pas. Attendu : 404 Not Found, format Problem Details."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 - Verification de la persistance",
+      "item": [
+        {
+          "name": "1. Lister les endroits avant redemarrage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Etape manuelle : executer cette requete, noter le nombre total d'endroits (pagination.totalItems), puis redemarrer le serveur (Ctrl+C, npm run start:dev) et executer a nouveau la meme requete. Le nombre d'endroits doit rester identique, confirmant que les donnees ont bien ete relues depuis le fichier JSON."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

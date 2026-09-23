@@ -4,8 +4,6 @@ import { dirname } from 'node:path';
 import { Database } from './database.types';
 import { ConfigService } from '@nestjs/config';
 
-const DEFAULT_DATA_FILE_PATH = './data/campus-rate.json';
-
 @Injectable()
 export class JsonDatabaseService {
   private readonly filePath: string;
