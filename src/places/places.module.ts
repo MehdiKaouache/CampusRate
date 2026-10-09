@@ -4,6 +4,7 @@ import { PlacesService } from './places.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PlaceRecord, PlaceRecordSchema } from './schemas/place.schema';
 import { ReviewRecord, ReviewRecordSchema } from '../reviews/schemas/review.schema';
+import { PlacesRepository } from './places.repository';
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { ReviewRecord, ReviewRecordSchema } from '../reviews/schemas/review.sche
     ]),
   ],
   controllers: [PlacesController],
-  providers: [PlacesService]
+  providers: [PlacesService, PlacesRepository]
 })
 export class PlacesModule {}
