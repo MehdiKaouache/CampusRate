@@ -1,119 +1,90 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { JsonDatabaseService } from '../common/persistence/json-database.service';
-import { CreateReviewDto } from './dto/create-review.dto';
+import { ReviewsRepository, ReviewChanges } from './reviews.repository';
 import { Review } from './entities/review.entity';
-import { generateId } from '../common/utils/id-generator';
+import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { generateId } from '../common/utils/id-generator';
+import { toReview } from './mappers/review.mapper';
 
 @Injectable()
 export class ReviewsService {
-    constructor(private readonly database: JsonDatabaseService) {}
+    constructor(private readonly reviewsRepository: ReviewsRepository){}
 
     async create(placeId: string, dto: CreateReviewDto): Promise<Review> {
-        const data = await this.database.read();
-        const place = data.places.find((p) => p.id === placeId);
+        await this.ensurePlaceExists(placeId);
 
-        if (!place) {
-            throw new NotFoundException(`Aucun endroit ne possede l'identifiant ${placeId}.`);
-        }
-
-        const now = new Date().toISOString();
-
-        const newReview: Review = {
+        const record = await this.reviewsRepository.create({
             id: generateId('rev'),
             placeId,
             authorName: dto.authorName,
             rating: dto.rating,
             comment: dto.comment,
-            createdAt: now,
-            updatedAt: now,
-        };
+        });
 
-        data.reviews.push(newReview);
+        await this.refreshPlaceRating(placeId);
 
-        this.recalculatePlaceRating(place, data.reviews);
-
-        await this.database.write(data);
-
-        return newReview;
+        return toReview(record);
     }
 
     async findAllByPlace(placeId: string): Promise<Review[]> {
-        const data = await this.database.read();
-        const place = data.places.find((p) => p.id === placeId);
+        await this.ensurePlaceExists(placeId);
 
-        if (!place) {
-            throw new NotFoundException(`Aucun endroit ne possede l'identifiant ${placeId}.`);
-        }
+        const records = await this.reviewsRepository.findByPlace(placeId);
 
-        return data.reviews.filter((r) => r.placeId === placeId);
-        
+        return records.map(toReview);
     }
 
     async findOne(id: string): Promise<Review> {
-        const data = await this.database.read();
-        const review = data.reviews.find((r) => r.id === id);
+        const record = await this.reviewsRepository.findById(id);
 
-        if (!review) {
+        if (!record) {
             throw new NotFoundException(`Aucune appreciation ne possede l'identifiant ${id}.`);
         }
 
-        return review;
+        return toReview(record);
     }
 
     async update(id: string, dto: UpdateReviewDto): Promise<Review> {
-        const data = await this.database.read();
-        const review = data.reviews.find((r) => r.id === id);
+        const changes: ReviewChanges = {};
 
-        if (!review) {
+        if (dto.authorName !== undefined) changes.authorName = dto.authorName;
+        if (dto.rating !== undefined) changes.rating = dto.rating;
+        if (dto.comment !== undefined) changes.comment = dto.comment;
+
+        const record = await this.reviewsRepository.update(id, changes);
+
+        if (!record) {
             throw new NotFoundException(`Aucune appreciation ne possede l'identifiant ${id}.`);
         }
 
-        if (dto.authorName !== undefined) review.authorName = dto.authorName;
-        if (dto.rating !== undefined) review.rating = dto.rating;
-        if (dto.comment !== undefined) review.comment = dto.comment;
+        await this.refreshPlaceRating(record.placeId);
 
-        review.updatedAt = new Date().toISOString();
-
-        const place = data.places.find((p) => p.id === review.placeId);
-        if (place) {
-            this.recalculatePlaceRating(place, data.reviews);
-        }
-
-        await this.database.write(data);
-
-        return review;
+        return toReview(record);
     }
-
 
     async remove(id: string): Promise<void> {
-        const data = await this.database.read();
-        const review = data.reviews.find((r) => r.id === id);
+        const record = await this.reviewsRepository.findById(id);
 
-        if (!review) {
+        if (!record) {
             throw new NotFoundException(`Aucune appreciation ne possede l'identifiant ${id}.`);
         }
 
-        data.reviews = data.reviews.filter((r) => r.id !== id);
+        await this.reviewsRepository.delete(id);
 
-        const place = data.places.find((p) => p.id === review.placeId);
-        if (place) {
-            this.recalculatePlaceRating(place, data.reviews);
-        }
-
-        await this.database.write(data);
+        await this.refreshPlaceRating(record.placeId);
     }
 
-    private recalculatePlaceRating(place: { id: string; averageRating: number | null; reviewCount: number }, allReviews: Review[]): void {
-        const placeReviews = allReviews.filter((r) => r.placeId === place.id);
+    private async ensurePlaceExists(placeId: string): Promise<void> {
+        const exists = await this.reviewsRepository.placeExists(placeId);
 
-        place.reviewCount = placeReviews.length;
-
-        if (placeReviews.length === 0) {
-            place.averageRating = null;
-        } else {
-            const sum = placeReviews.reduce((total, r) => total + r.rating, 0);
-            place.averageRating = sum / placeReviews.length;
+        if (!exists) {
+            throw new NotFoundException(`Aucun endroit ne possede l'identifiant ${placeId}.`);
         }
-  }
+    }
+
+    private async refreshPlaceRating(placeId: string): Promise<void> {
+        const stats = await this.reviewsRepository.getRatingStats(placeId);
+
+        await this.reviewsRepository.savePlaceRating(placeId, stats);
+    }
 }

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { PlacesModule } from './places/places.module';
 import { ReviewsModule } from './reviews/reviews.module';
-import { CommonModule } from './common/common.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { envValidationSchema } from './config/env-validation.schema';
+import { MongooseModule } from '@nestjs/mongoose';
 
 @Module({
   imports: [
@@ -11,7 +11,14 @@ import { envValidationSchema } from './config/env-validation.schema';
       isGlobal: true,
       validationSchema: envValidationSchema,
     }),
-    PlacesModule, ReviewsModule, CommonModule],
+    MongooseModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        uri: configService.get<string>('MONGO_URI'),
+        serverSelectionTimeoutMS: 5000,
+      }),
+    }),
+    PlacesModule, ReviewsModule],
   controllers: [],
   providers: [],
 })

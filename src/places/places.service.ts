@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { JsonDatabaseService } from '../common/persistence/json-database.service';
+import { PlacesRepository, PlaceChanges } from './places.repository';
 import { Place } from './entities/place.entity';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { generateId } from '../common/utils/id-generator';
@@ -7,32 +7,27 @@ import { PlaceStatus } from './entities/place-status.enum';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { PagesResponse } from '../common/dto/pages-response.dto';
 import { FindPlacesQueryDto } from './dto/find-places-query.dto';
+import { toPlace } from './mappers/place.mapper';
 
 @Injectable()
 export class PlacesService {
-    constructor(private readonly database: JsonDatabaseService){}
+    constructor(private readonly placesRepository: PlacesRepository){}
 
     async findAll(query: FindPlacesQueryDto): Promise<PagesResponse<Place>> {
-        const data = await this.database.read();
-        
-        let filteredPlaces = data.places;
-
-        if (query.category !== undefined) {
-            filteredPlaces = filteredPlaces.filter(
-                (p) => p.category === query.category,
-            );
-        }
-
         const page = query.page ?? 1;
         const limit = query.limit ?? 10;
-        const totalItems = filteredPlaces.length;
+
+        const records = await this.placesRepository.findPage(
+            query.category,
+            (page - 1) * limit,
+            limit,
+        );
+
+        const totalItems = await this.placesRepository.count(query.category);
         const totalPages = Math.ceil(totalItems / limit);
 
-        const start = (page - 1) * limit;
-        const paginatedPlaces = filteredPlaces.slice(start, start + limit);
-
         return {
-            data: paginatedPlaces,
+            data: records.map(toPlace),
             pagination: {
                 page,
                 limit,
@@ -43,11 +38,7 @@ export class PlacesService {
     }
 
     async create(dto: CreatePlaceDto): Promise<Place>{
-        const data = await this.database.read();
-
-        const now = new Date().toISOString();
-
-        const newPlace: Place = {
+        const record = await this.placesRepository.create({
             id: generateId('plc'),
             name: dto.name,
             description: dto.description,
@@ -57,60 +48,50 @@ export class PlacesService {
             status: dto.status ?? PlaceStatus.ACTIVE,
             averageRating: null,
             reviewCount: 0,
-            createdAt: now,
-            updatedAt: now,
-        };
+        });
 
-        data.places.push(newPlace);
-        await this.database.write(data);
-
-        return newPlace;
+        return toPlace(record);
     }
 
     async findOne(id: string): Promise<Place> {
-        const data = await this.database.read();
-        const place = data.places.find((p) => p.id === id);
+        const record = await this.placesRepository.findById(id);
 
-        if (!place) {
+        if (!record) {
             throw new NotFoundException(`Aucun endroit ne possede l'identifiant ${id}.`);
         }
 
-        return place;
+        return toPlace(record);
     }
 
 
     async update(id: string, dto: UpdatePlaceDto): Promise<Place> {
-        const data = await this.database.read();
-        const place = data.places.find((p) => p.id === id);
+        const changes: PlaceChanges = {};
 
-        if (!place) {
+        if (dto.name !== undefined) changes.name = dto.name;
+        if (dto.description !== undefined) changes.description = dto.description;
+        if (dto.category !== undefined) changes.category = dto.category;
+        if (dto.address !== undefined) changes.address = dto.address;
+        if (dto.services !== undefined) changes.services = this.removeDuplicates(dto.services);
+        if (dto.status !== undefined) changes.status = dto.status;
+
+        const record = await this.placesRepository.update(id, changes);
+
+        if (!record) {
             throw new NotFoundException(`Aucun endroit ne possede l'identifiant ${id}.`);
         }
 
-        if (dto.name !== undefined) place.name = dto.name;
-        if (dto.description !== undefined) place.description = dto.description;
-        if (dto.category !== undefined) place.category = dto.category;
-        if (dto.address !== undefined) place.address = dto.address;
-        if (dto.services !== undefined) place.services = this.removeDuplicates(dto.services);
-        if (dto.status !== undefined) place.status = dto.status;
-
-        place.updatedAt = new Date().toISOString();
-
-        await this.database.write(data);
-
-        return place;
+        return toPlace(record);
     }
 
 
     async remove(id: string): Promise<void> {
-        const data = await this.database.read();
-        const place = data.places.find((p) => p.id === id);
+        const record = await this.placesRepository.findById(id);
 
-        if (!place) {
+        if (!record) {
             throw new NotFoundException(`Aucun endroit ne possede l'identifiant ${id}.`);
         }
 
-        const hasReviews = data.reviews.some((review) => review.placeId === id);
+        const hasReviews = await this.placesRepository.hasReviews(id);
 
         if (hasReviews) {
             throw new ConflictException(
@@ -118,8 +99,7 @@ export class PlacesService {
             );
         }
 
-        data.places = data.places.filter((p) => p.id !== id);
-        await this.database.write(data);
+        await this.placesRepository.delete(id);
     }
 
     private removeDuplicates(services: string[]): string[]{
