@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PlacesModule } from './places/places.module';
 import { ReviewsModule } from './reviews/reviews.module';
-import { CommonModule } from './common/common.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { envValidationSchema } from './config/env-validation.schema';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -19,7 +18,7 @@ import { MongooseModule } from '@nestjs/mongoose';
         serverSelectionTimeoutMS: 5000,
       }),
     }),
-    PlacesModule, ReviewsModule, CommonModule],
+    PlacesModule, ReviewsModule],
   controllers: [],
   providers: [],
 })

@@ -9,5 +9,4 @@ export const envValidationSchema = Joi.object({
       'string.pattern.base':
         'MONGO_URI doit commencer par mongodb:// ou mongodb+srv://',
     }),
-  DATA_FILE_PATH: Joi.string().optional(),
 });
