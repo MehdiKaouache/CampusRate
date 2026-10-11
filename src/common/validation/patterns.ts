@@ -1,0 +1,1 @@
+export const MEANINGFUL_TEXT = /[a-zA-Z\dÀ-ÿ]/;
