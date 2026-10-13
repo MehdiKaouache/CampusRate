@@ -9,4 +9,5 @@ export const envValidationSchema = Joi.object({
       'string.pattern.base':
         'MONGO_URI doit commencer par mongodb:// ou mongodb+srv://',
     }),
+    CORS_ORIGINS: Joi.string().required()
 });
