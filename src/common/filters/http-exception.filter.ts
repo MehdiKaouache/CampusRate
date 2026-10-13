@@ -7,7 +7,8 @@ const STATUS_TITLES: Record<number, string> = {
   403: 'Forbidden',
   404: 'Not Found',
   409: 'Conflict',
-  500: 'Internal Server Error',
+  415: 'Unsupported Media Type',
+  500: 'Internal Server Error'
 };
 
 @Catch()
@@ -25,7 +26,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       title: STATUS_TITLES[status] ?? 'Error',
       status,
       detail: messages[0],
-      instance: request.url,
+      instance: request.originalUrl,
       ...(messages.length > 1 ? { errors: messages } : {}),
     });
   }
