@@ -1,4 +1,4 @@
-import {ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus} from '@nestjs/common';
+import {ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger} from '@nestjs/common';
 import { Response, Request } from 'express';
 
 const STATUS_TITLES: Record<number, string> = {
@@ -13,6 +13,8 @@ const STATUS_TITLES: Record<number, string> = {
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -20,6 +22,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const status = this.resolveStatus(exception);
     const messages = this.resolveMessages(exception, status);
+
+    this.logError(exception, request, status, messages[0]);
 
     response.status(status).type('application/problem+json').json({
       type: 'about:blank',
@@ -30,6 +34,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ...(messages.length > 1 ? { errors: messages } : {}),
     });
   }
+
+  private logError(exception: unknown, request: Request, status: number, detail: string): void {
+        const line = `${request.method} ${request.originalUrl} ${status}`;
+
+        if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+            const message = exception instanceof Error ? exception.message : String(exception);
+            const stack = exception instanceof Error ? exception.stack : undefined;
+
+            this.logger.error(`${line} - ${message}`, stack);
+            return;
+        }
+
+        this.logger.warn(`${line} - ${detail}`);
+    }
 
   private resolveStatus(exception: unknown): number {
     if (exception instanceof HttpException) {
