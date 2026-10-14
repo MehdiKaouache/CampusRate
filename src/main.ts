@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { configureSwagger } from './configure-swagger';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -28,6 +29,14 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT')!;
+
+  app.use(helmet());
+  
+  app.enableCors({
+    origin: configService.get<string>('CORS_ORIGINS')!.split(',').map((origin) => origin.trim()),
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type']
+  });
 
   await app.listen(port);
 }

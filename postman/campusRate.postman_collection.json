@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CampusRate",
-    "description": "Collection d'essais manuels pour l'API CampusRate (TP1, 420-514). Couvre la creation et la consultation des deux ressources, une modification, une suppression permise, une note invalide, une ressource inexistante, un conflit de suppression, le filtre, la pagination, une erreur Problem Details, et la verification de la persistance apres redemarrage.",
+    "description": "Collection d'essais manuels de l'API CampusRate (TP2, 420-514). Couvre la creation et la consultation, la modification, la suppression, le conflit 409, la validation (propriete absente, valeur invalide, propriete inconnue, champ controle par le serveur, injection NoSQL), le 415 et la persistance dans MongoDB.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -53,7 +53,7 @@
                 "places"
               ]
             },
-            "description": "Cree un endroit et enregistre son id pour les requetes suivantes. Attendu : 201 Created.",
+            "description": "Scenario 1 du TP2 : creation d'une ressource valide. Attendu : 201.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Bibliotheque principale\",\n  \"description\": \"Espace calme avec prises.\",\n  \"category\": \"LIBRARY\",\n  \"address\": \"Pavillon A, local A-210\",\n  \"services\": [\n    \"WIFI\",\n    \"POWER_OUTLETS\"\n  ]\n}",
@@ -73,8 +73,12 @@
                   "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
                   "const data = pm.response.json();",
                   "pm.collectionVariables.set('placeId', data.id);",
-                  "pm.test('averageRating is null', function () { pm.expect(data.averageRating).to.be.null; });",
-                  "pm.test('reviewCount is 0', function () { pm.expect(data.reviewCount).to.eql(0); });"
+                  "pm.test('id genere par le serveur', function () { pm.expect(data.id).to.match(/^plc_/); });",
+                  "pm.test('aucun _id expose', function () { pm.expect(data).to.not.have.property('_id'); });",
+                  "pm.test('averageRating null et reviewCount 0', function () {",
+                  "  pm.expect(data.averageRating).to.be.null;",
+                  "  pm.expect(data.reviewCount).to.eql(0);",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -96,7 +100,7 @@
                 "{{placeId}}"
               ]
             },
-            "description": "Consulte l'endroit cree a l'etape precedente. Attendu : 200 OK."
+            "description": "Scenario 2 du TP2 : consultation d'une ressource persistee dans MongoDB. Attendu : 200."
           },
           "response": [],
           "event": [
@@ -131,7 +135,7 @@
                 "{{placeId}}"
               ]
             },
-            "description": "Modifie uniquement le statut de l'endroit. Attendu : 200 OK, updatedAt change, les autres champs restent identiques.",
+            "description": "Scenario 7 du TP2 : modification valide. Attendu : 200, updatedAt change.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"status\": \"TEMPORARILY_CLOSED\"\n}",
@@ -150,7 +154,8 @@
                 "exec": [
                   "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
                   "const data = pm.response.json();",
-                  "pm.test('status was updated', function () { pm.expect(data.status).to.eql('TEMPORARILY_CLOSED'); });"
+                  "pm.test('status modifie', function () { pm.expect(data.status).to.eql('TEMPORARILY_CLOSED'); });",
+                  "pm.test('updatedAt different de createdAt', function () { pm.expect(data.updatedAt).to.not.eql(data.createdAt); });"
                 ],
                 "type": "text/javascript"
               }
@@ -158,7 +163,7 @@
           ]
         },
         {
-          "name": "4. Filtrer les endroits par categorie",
+          "name": "4. Filtrer par categorie",
           "request": {
             "method": "GET",
             "header": [],
@@ -171,13 +176,13 @@
                 "places"
               ],
               "query": [
-                [
-                  "category",
-                  "LIBRARY"
-                ]
+                {
+                  "key": "category",
+                  "value": "LIBRARY"
+                }
               ]
             },
-            "description": "Filtre exact sur la categorie LIBRARY. Attendu : 200 OK, uniquement des endroits LIBRARY dans data."
+            "description": "Filtre exact sur la categorie. Attendu : 200, uniquement des LIBRARY."
           },
           "response": [],
           "event": [
@@ -187,7 +192,7 @@
                 "exec": [
                   "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
                   "const data = pm.response.json();",
-                  "pm.test('all results match category', function () {",
+                  "pm.test('toutes les places sont LIBRARY', function () {",
                   "  data.data.forEach((place) => pm.expect(place.category).to.eql('LIBRARY'));",
                   "});"
                 ],
@@ -197,7 +202,7 @@
           ]
         },
         {
-          "name": "5. Pagination des endroits",
+          "name": "5. Pagination",
           "request": {
             "method": "GET",
             "header": [],
@@ -210,17 +215,17 @@
                 "places"
               ],
               "query": [
-                [
-                  "page",
-                  "1"
-                ],
-                [
-                  "limit",
-                  "2"
-                ]
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "2"
+                }
               ]
             },
-            "description": "Verifie la pagination. Attendu : 200 OK, data.length <= 2, pagination.limit = 2."
+            "description": "Attendu : 200, au plus 2 elements, pagination presente."
           },
           "response": [],
           "event": [
@@ -230,10 +235,9 @@
                 "exec": [
                   "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
                   "const data = pm.response.json();",
-                  "pm.test('limit is respected', function () { pm.expect(data.data.length).to.be.at.most(2); });",
-                  "pm.test('pagination meta present', function () {",
-                  "  pm.expect(data.pagination).to.have.property('totalItems');",
-                  "  pm.expect(data.pagination).to.have.property('totalPages');",
+                  "pm.test('limit respecte', function () { pm.expect(data.data.length).to.be.at.most(2); });",
+                  "pm.test('metadonnees de pagination', function () {",
+                  "  ['page', 'limit', 'totalItems', 'totalPages'].forEach((key) => pm.expect(data.pagination).to.have.property(key));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -267,7 +271,7 @@
                 "reviews"
               ]
             },
-            "description": "Cree une appreciation pour l'endroit cree plus tot. Attendu : 201 Created.",
+            "description": "Attendu : 201.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"authorName\": \"Samira\",\n  \"rating\": 4,\n  \"comment\": \"Calme et Wi-Fi stable.\"\n}",
@@ -287,7 +291,8 @@
                   "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
                   "const data = pm.response.json();",
                   "pm.collectionVariables.set('reviewId', data.id);",
-                  "pm.test('placeId matches', function () { pm.expect(data.placeId).to.eql(pm.collectionVariables.get('placeId')); });"
+                  "pm.test('placeId correspond', function () { pm.expect(data.placeId).to.eql(pm.collectionVariables.get('placeId')); });",
+                  "pm.test('aucun _id expose', function () { pm.expect(data).to.not.have.property('_id'); });"
                 ],
                 "type": "text/javascript"
               }
@@ -295,7 +300,7 @@
           ]
         },
         {
-          "name": "2. Consulter l'appreciation creee",
+          "name": "2. Consulter l'appreciation",
           "request": {
             "method": "GET",
             "header": [],
@@ -309,7 +314,7 @@
                 "{{reviewId}}"
               ]
             },
-            "description": "Consulte l'appreciation via son id, independamment de l'endroit. Attendu : 200 OK."
+            "description": "Attendu : 200."
           },
           "response": [],
           "event": [
@@ -325,7 +330,7 @@
           ]
         },
         {
-          "name": "3. Verifier la mise a jour de la note moyenne",
+          "name": "3. Verifier la note moyenne de l'endroit",
           "request": {
             "method": "GET",
             "header": [],
@@ -339,7 +344,7 @@
                 "{{placeId}}"
               ]
             },
-            "description": "Confirme que averageRating et reviewCount de l'endroit ont ete recalcules apres la creation de l'appreciation. Attendu : averageRating = 4, reviewCount = 1."
+            "description": "La moyenne est recalculee par agregation MongoDB. Attendu : averageRating 4 et reviewCount 1."
           },
           "response": [],
           "event": [
@@ -349,8 +354,8 @@
                 "exec": [
                   "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
                   "const data = pm.response.json();",
-                  "pm.test('averageRating reflects the review', function () { pm.expect(data.averageRating).to.eql(4); });",
-                  "pm.test('reviewCount reflects the review', function () { pm.expect(data.reviewCount).to.eql(1); });"
+                  "pm.test('averageRating = 4', function () { pm.expect(data.averageRating).to.eql(4); });",
+                  "pm.test('reviewCount = 1', function () { pm.expect(data.reviewCount).to.eql(1); });"
                 ],
                 "type": "text/javascript"
               }
@@ -372,7 +377,7 @@
                 "{{reviewId}}"
               ]
             },
-            "description": "Supprime l'appreciation. Attendu : 204 No Content, corps vide."
+            "description": "Attendu : 204, corps vide."
           },
           "response": [],
           "event": [
@@ -411,10 +416,10 @@
                 "places"
               ]
             },
-            "description": "Cree un endroit sans aucune appreciation, pour tester la suppression permise.",
+            "description": "Endroit sans appreciation.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Local temporaire\",\n  \"description\": \"Endroit destine a etre supprime.\",\n  \"category\": \"OTHER\",\n  \"address\": \"Pavillon C\"\n}",
+              "raw": "{\n  \"name\": \"Local temporaire\",\n  \"description\": \"Endroit destine a etre supprime.\",\n  \"category\": \"OTHER\",\n  \"address\": \"Pavillon C\",\n  \"services\": []\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -429,8 +434,7 @@
               "script": {
                 "exec": [
                   "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
-                  "const data = pm.response.json();",
-                  "pm.collectionVariables.set('placeToDeleteId', data.id);"
+                  "pm.collectionVariables.set('placeToDeleteId', pm.response.json().id);"
                 ],
                 "type": "text/javascript"
               }
@@ -438,7 +442,7 @@
           ]
         },
         {
-          "name": "2. Supprimer l'endroit (suppression permise)",
+          "name": "2. Supprimer l'endroit (permis)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -452,7 +456,7 @@
                 "{{placeToDeleteId}}"
               ]
             },
-            "description": "L'endroit ne possede aucune appreciation : la suppression doit etre permise. Attendu : 204 No Content."
+            "description": "Attendu : 204."
           },
           "response": [],
           "event": [
@@ -468,7 +472,7 @@
           ]
         },
         {
-          "name": "3. Creer un endroit pour le scenario de conflit",
+          "name": "3. Creer un endroit pour le conflit",
           "request": {
             "method": "POST",
             "header": [
@@ -486,10 +490,10 @@
                 "places"
               ]
             },
-            "description": "Cree un endroit qui recevra une appreciation, pour declencher un conflit de suppression.",
+            "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Local avec appreciation\",\n  \"description\": \"Endroit qui recevra une appreciation.\",\n  \"category\": \"OTHER\",\n  \"address\": \"Pavillon D\"\n}",
+              "raw": "{\n  \"name\": \"Local avec appreciation\",\n  \"description\": \"Endroit qui recevra une appreciation.\",\n  \"category\": \"OTHER\",\n  \"address\": \"Pavillon D\",\n  \"services\": []\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -504,8 +508,7 @@
               "script": {
                 "exec": [
                   "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
-                  "const data = pm.response.json();",
-                  "pm.collectionVariables.set('placeConflictId', data.id);"
+                  "pm.collectionVariables.set('placeConflictId', pm.response.json().id);"
                 ],
                 "type": "text/javascript"
               }
@@ -533,7 +536,7 @@
                 "reviews"
               ]
             },
-            "description": "Ajoute une appreciation, ce qui doit empecher la suppression de l'endroit.",
+            "description": "",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"authorName\": \"Test\",\n  \"rating\": 3,\n  \"comment\": \"Appreciation pour test de conflit.\"\n}",
@@ -551,8 +554,7 @@
               "script": {
                 "exec": [
                   "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
-                  "const data = pm.response.json();",
-                  "pm.collectionVariables.set('reviewConflictId', data.id);"
+                  "pm.collectionVariables.set('reviewConflictId', pm.response.json().id);"
                 ],
                 "type": "text/javascript"
               }
@@ -560,7 +562,7 @@
           ]
         },
         {
-          "name": "5. Tentative de suppression (409 Conflict)",
+          "name": "5. Tentative de suppression (409)",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -574,7 +576,7 @@
                 "{{placeConflictId}}"
               ]
             },
-            "description": "L'endroit possede une appreciation : la suppression doit etre refusee. Attendu : 409 Conflict, format Problem Details."
+            "description": "L'endroit possede une appreciation. Attendu : 409, Problem Details."
           },
           "response": [],
           "event": [
@@ -585,14 +587,6 @@
                   "pm.test('Status is 409', function () { pm.response.to.have.status(409); });",
                   "pm.test('Content-Type is problem+json', function () {",
                   "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
-                  "});",
-                  "const data = pm.response.json();",
-                  "pm.test('Problem Details format', function () {",
-                  "  pm.expect(data).to.have.property('type');",
-                  "  pm.expect(data).to.have.property('title');",
-                  "  pm.expect(data).to.have.property('status');",
-                  "  pm.expect(data).to.have.property('detail');",
-                  "  pm.expect(data).to.have.property('instance');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -603,10 +597,161 @@
       ]
     },
     {
-      "name": "04 - Scenarios d'erreur",
+      "name": "04 - Validation et securite",
       "item": [
         {
-          "name": "1. Note invalide (400 Bad Request)",
+          "name": "1. Propriete obligatoire absente (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Scenario 4 du TP2 : l'adresse est absente. Attendu : 400 avec la liste errors.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test\",\n  \"description\": \"Description valide\",\n  \"category\": \"LIBRARY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});",
+                  "pm.test('liste errors presente', function () { pm.expect(data.errors).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Valeur invalide : nom compose d'espaces (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Scenario 5 du TP2. Attendu : 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"   \",\n  \"description\": \"Espace calme avec prises.\",\n  \"category\": \"LIBRARY\",\n  \"address\": \"Pavillon A, local A-210\",\n  \"services\": [\n    \"WIFI\",\n    \"POWER_OUTLETS\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Valeur invalide : categorie inconnue (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Scenario 5 du TP2. Attendu : 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bibliotheque principale\",\n  \"description\": \"Espace calme avec prises.\",\n  \"category\": \"INVALIDE\",\n  \"address\": \"Pavillon A, local A-210\",\n  \"services\": [\n    \"WIFI\",\n    \"POWER_OUTLETS\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Valeur invalide : note donnee en texte (400)",
           "request": {
             "method": "POST",
             "header": [
@@ -626,7 +771,59 @@
                 "reviews"
               ]
             },
-            "description": "La note doit etre entre 1 et 5. Attendu : 400 Bad Request, format Problem Details.",
+            "description": "La chaine \"4\" n'est pas convertie en nombre. Attendu : 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorName\": \"Samira\",\n  \"rating\": \"4\",\n  \"comment\": \"Tres bien\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Valeur invalide : note hors limite (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeId}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeId}}",
+                "reviews"
+              ]
+            },
+            "description": "Attendu : 400.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"authorName\": \"Test\",\n  \"rating\": 999,\n  \"comment\": \"Note hors limite.\"\n}",
@@ -644,10 +841,12 @@
               "script": {
                 "exec": [
                   "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
                   "const data = pm.response.json();",
                   "pm.test('Problem Details format', function () {",
-                  "  pm.expect(data).to.have.property('type');",
-                  "  pm.expect(data).to.have.property('status', 400);",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -656,7 +855,254 @@
           ]
         },
         {
-          "name": "2. Endroit inexistant (404 Not Found)",
+          "name": "6. Propriete inconnue (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Scenario 6 du TP2. Attendu : 400, property foo should not exist.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bibliotheque principale\",\n  \"description\": \"Espace calme avec prises.\",\n  \"category\": \"LIBRARY\",\n  \"address\": \"Pavillon A, local A-210\",\n  \"services\": [\n    \"WIFI\",\n    \"POWER_OUTLETS\"\n  ],\n  \"foo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Champ controle par le serveur a la creation : id (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Le client ne peut pas imposer l'id. Attendu : 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bibliotheque principale\",\n  \"description\": \"Espace calme avec prises.\",\n  \"category\": \"LIBRARY\",\n  \"address\": \"Pavillon A, local A-210\",\n  \"services\": [\n    \"WIFI\",\n    \"POWER_OUTLETS\"\n  ],\n  \"id\": \"plc_impose\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Champ controle par le serveur a la modification : averageRating (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places/{{placeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places",
+                "{{placeId}}"
+              ]
+            },
+            "description": "Scenario 8 du TP2. Attendu : 400, property averageRating should not exist.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"averageRating\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Injection NoSQL : objet a la place d'une chaine (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Un objet fourni par le client est refuse avant d'atteindre MongoDB. Attendu : 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": {\n    \"$ne\": null\n  },\n  \"description\": \"Espace calme avec prises.\",\n  \"category\": \"LIBRARY\",\n  \"address\": \"Pavillon A, local A-210\",\n  \"services\": [\n    \"WIFI\",\n    \"POWER_OUTLETS\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Problem Details format', function () {",
+                  "  ['type', 'title', 'status', 'detail', 'instance'].forEach((key) => pm.expect(data).to.have.property(key));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Content-Type non JSON (415)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "places"
+              ]
+            },
+            "description": "Option H3. Attendu : 415, Problem Details.",
+            "body": {
+              "mode": "raw",
+              "raw": "bonjour",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 415', function () { pm.response.to.have.status(415); });",
+                  "pm.test('Content-Type is problem+json', function () {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Endroit inexistant (404)",
           "request": {
             "method": "GET",
             "header": [],
@@ -670,7 +1116,7 @@
                 "plc_inexistant123"
               ]
             },
-            "description": "Consultation d'un identifiant qui n'existe pas. Attendu : 404 Not Found, format Problem Details."
+            "description": "Attendu : 404, Problem Details."
           },
           "response": [],
           "event": [
@@ -691,10 +1137,10 @@
       ]
     },
     {
-      "name": "05 - Verification de la persistance",
+      "name": "05 - Persistance apres redemarrage",
       "item": [
         {
-          "name": "1. Lister les endroits avant redemarrage",
+          "name": "1. Lister les endroits",
           "request": {
             "method": "GET",
             "header": [],
@@ -707,7 +1153,7 @@
                 "places"
               ]
             },
-            "description": "Etape manuelle : executer cette requete, noter le nombre total d'endroits (pagination.totalItems), puis redemarrer le serveur (Ctrl+C, npm run start:dev) et executer a nouveau la meme requete. Le nombre d'endroits doit rester identique, confirmant que les donnees ont bien ete relues depuis le fichier JSON."
+            "description": "Scenario 3 du TP2. Execute cette requete et note pagination.totalItems. Redemarre ensuite l'API (Ctrl+C puis npm run start:dev) et execute-la de nouveau : le total doit rester identique. Verifie aussi les collections places et reviews dans MongoDB Compass."
           },
           "response": [],
           "event": [
