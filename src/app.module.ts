@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { envValidationSchema } from './config/env-validation.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ContentTypeMiddleware } from './common/middleware/content-type.middleware';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
 @Module({
   imports: [
@@ -25,6 +26,6 @@ import { ContentTypeMiddleware } from './common/middleware/content-type.middlewa
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(ContentTypeMiddleware).forRoutes('*')
+    consumer.apply(RequestLoggerMiddleware, ContentTypeMiddleware).forRoutes('{*path}')
   }
 }
