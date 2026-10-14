@@ -2,7 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch } fro
 import { ReviewsService } from '../reviews.service';
 import { Review } from '../entities/review.entity';
 import { UpdateReviewDto } from '../dto/update-review.dto';
-import { ApiNoContentResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ProblemDetailsDto } from '../../common/dto/problem-details.dto';
+import { ApiBadRequestResponse, ApiNoContentResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnsupportedMediaTypeResponse } from '@nestjs/swagger';
 
 @ApiTags('Reviews')
 @Controller({ path: 'reviews', version: '1' })
@@ -13,14 +14,17 @@ export class ReviewsDetailController {
     summary: 'Consulter une appreciation',
     description: 'Retourne une appreciation precise par son identifiant.'
   })
-  @ApiParam({ name: 'id', 
+  @ApiParam({ 
+    name: 'id', 
     description: 'Identifiant de l\'appreciation' 
   })
   @ApiOkResponse({ 
-    description: 'Appreciation trouvee.', type: Review 
+    description: 'Appreciation trouvee.', 
+    type: Review 
   })
   @ApiNotFoundResponse({ 
-    description: 'Aucune appreciation ne possede cet identifiant.' 
+    description: 'Aucune appreciation ne possede cet identifiant.', 
+    type: ProblemDetailsDto 
   })
   @Get(':id')
   findOne(@Param('id') id: string): Promise<Review> {
@@ -40,8 +44,17 @@ export class ReviewsDetailController {
     description: 'Appreciation modifiee.', 
     type: Review 
   })
+  @ApiBadRequestResponse({ 
+    description: 'Donnees invalides, propriete inconnue ou controlee par le serveur.', 
+    type: ProblemDetailsDto 
+  })
   @ApiNotFoundResponse({ 
-    description: 'Aucune appreciation ne possede cet identifiant.' 
+    description: 'Aucune appreciation ne possede cet identifiant.', 
+    type: ProblemDetailsDto 
+  })
+  @ApiUnsupportedMediaTypeResponse({ 
+    description: 'Le Content-Type doit etre application/json.', 
+    type: ProblemDetailsDto 
   })
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateReviewDto): Promise<Review> {
@@ -61,7 +74,8 @@ export class ReviewsDetailController {
     description: 'Appreciation supprimee.' 
   })
   @ApiNotFoundResponse({ 
-    description: 'Aucune appreciation ne possede cet identifiant.' 
+    description: 'Aucune appreciation ne possede cet identifiant.', 
+    type: ProblemDetailsDto 
   })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)

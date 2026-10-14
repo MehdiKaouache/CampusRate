@@ -36,7 +36,7 @@ export class PlacesRepository {
   }
 
   update(id: string, changes: PlaceChanges): Promise<PlaceRecord | null> {
-    return this.placeModel.findOneAndUpdate({ id }, { $set: changes }, { new: true, runValidators: true }).exec();
+    return this.placeModel.findOneAndUpdate({ id }, { $set: changes }, { returnDocument: 'after', runValidators: true }).exec();
   }
 
   async delete(id: string): Promise<void> {
