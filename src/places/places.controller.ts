@@ -5,7 +5,8 @@ import { CreatePlaceDto } from './dto/create-place.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { PagesResponse } from '../common/dto/pages-response.dto';
 import { FindPlacesQueryDto } from './dto/find-places-query.dto';
-import { ApiConflictResponse, ApiCreatedResponse, ApiNoContentResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ProblemDetailsDto } from '../common/dto/problem-details.dto';
+import { ApiBadRequestResponse, ApiConflictResponse, ApiCreatedResponse, ApiNoContentResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnsupportedMediaTypeResponse } from '@nestjs/swagger';
 
 @ApiTags('Places')
 @Controller({ path: 'places', version: '1' })
@@ -17,6 +18,10 @@ export class PlacesController {
         description: 'Retourne les endroits, avec filtrage par categorie et pagination.'
     })
     @ApiOkResponse({ description: 'Liste paginee des endroits.' })
+    @ApiBadRequestResponse({ 
+        description: 'Parametre de filtre ou de pagination invalide.', 
+        type: ProblemDetailsDto 
+    })
     @Get()
     findAll(@Query() query: FindPlacesQueryDto): Promise<PagesResponse<Place>> {
         return this.placeService.findAll(query);
@@ -28,6 +33,14 @@ export class PlacesController {
         description: 'Ajoute un endroit a la collection.'
     })
     @ApiCreatedResponse({ description: 'Endroit cree.', type: Place })
+    @ApiBadRequestResponse({ 
+        description: 'Donnees invalides, propriete manquante ou interdite.', 
+        type: ProblemDetailsDto 
+    })
+    @ApiUnsupportedMediaTypeResponse({ 
+        description: 'Le Content-Type doit etre application/json.', 
+        type: ProblemDetailsDto 
+    })
     @Post()
     @HttpCode(HttpStatus.CREATED)
     create(@Body() dto: CreatePlaceDto): Promise<Place> {
@@ -48,7 +61,8 @@ export class PlacesController {
         type: Place 
     })
     @ApiNotFoundResponse({ 
-        description: 'Aucun endroit ne possede cet identifiant.' 
+        description: 'Aucun endroit ne possede cet identifiant.', 
+        type: ProblemDetailsDto 
     })
     @Get(':id')
     findOne(@Param('id') id: string): Promise<Place> {
@@ -68,8 +82,17 @@ export class PlacesController {
         description: 'Endroit modifie.', 
         type: Place 
     })
+    @ApiBadRequestResponse({ 
+        description: 'Donnees invalides, propriete inconnue ou controlee par le serveur.', 
+        type: ProblemDetailsDto 
+    })
     @ApiNotFoundResponse({ 
-        description: 'Aucun endroit ne possede cet identifiant.' 
+        description: 'Aucun endroit ne possede cet identifiant.', 
+        type: ProblemDetailsDto 
+    })
+    @ApiUnsupportedMediaTypeResponse({ 
+        description: 'Le Content-Type doit etre application/json.', 
+        type: ProblemDetailsDto 
     })
     @Patch(':id')
     update(@Param('id') id: string, @Body() dto: UpdatePlaceDto): Promise<Place> {
@@ -89,10 +112,12 @@ export class PlacesController {
         description: 'Endroit supprime.' 
     })
     @ApiNotFoundResponse({ 
-        description: 'Aucun endroit ne possede cet identifiant.' 
+        description: 'Aucun endroit ne possede cet identifiant.', 
+        type: ProblemDetailsDto 
     })
     @ApiConflictResponse({ 
-        description: 'L\'endroit possede des appreciations.' 
+        description: 'L\'endroit possede des appreciations.', 
+        type: ProblemDetailsDto 
     })
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT) 
