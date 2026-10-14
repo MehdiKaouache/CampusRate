@@ -30,7 +30,7 @@ export class ReviewsRepository {
     }
 
     update(id: string, changes: ReviewChanges): Promise<ReviewRecord | null> {
-        return this.reviewModel.findOneAndUpdate({ id }, { $set: changes }, { new: true, runValidators: true }).exec();
+        return this.reviewModel.findOneAndUpdate({ id }, { $set: changes }, { returnDocument: 'after', runValidators: true }).exec();
     }
 
     async delete(id: string): Promise<void> {
